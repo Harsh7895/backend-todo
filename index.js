@@ -1,7 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const { configDotenv } = require("dotenv");
-const authRouter = require("./routes/auth.route");
+const AuthRouter = require("./routes/auth.route");
 const cors = requir("cors");
 
 configDotenv();
@@ -18,7 +18,6 @@ app.use(
 
 app.get("/", (req, res) => {
   res.send("Hello world");
-  res.end();
 });
 
 mongoose
@@ -34,7 +33,7 @@ app.listen(3000, () => {
   console.log("Server is running on port 3000");
 });
 
-app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/auth", AuthRouter);
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
