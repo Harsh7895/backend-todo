@@ -2,10 +2,19 @@ const express = require("express");
 const mongoose = require("mongoose");
 const { configDotenv } = require("dotenv");
 const authRouter = require("./routes/auth.route");
+const cors = requir("cors");
 
 configDotenv();
 const app = express();
 app.use(express.json());
+
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"],
+    credentials: true,
+  })
+);
 
 app.get("/", (req, res) => {
   res.send("Hello world");
