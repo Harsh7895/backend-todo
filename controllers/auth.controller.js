@@ -1,6 +1,7 @@
 const User = require("../models/user.schema");
 const ErrorHandler = require("../utils/error");
 const bcryptjs = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const createUser = async (req, res, next) => {
   try {
@@ -24,4 +25,34 @@ const createUser = async (req, res, next) => {
   }
 };
 
-module.exports = { createUser };
+const loginUser = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    const validUser = await User.findOne({ email });
+    if (!validUser) {
+      return next(ErrorHandler(401, "Wrong Username or Password"));
+    }
+
+    const validPass = bcryptjs.compareSync(password, validUser.password);
+    if (!validPass) {
+      return next(ErrorHandler(401, "Wrong Username or Password"));
+    }
+
+    const { password: pass, ...rest } = validUser._doc;
+    const token = jwt.sign({ id: validUser._id }, process.env.JWT_SECRET, {
+      expiresIn: "30d",
+    });
+
+    res.setHeader("Authorization", `Bearer ${token}`);
+    res.status(200).json({
+      success: true,
+      message: "Logged In Successfully",
+      rest,
+      token,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { createUser, loginUser };
