@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const { configDotenv } = require("dotenv");
 const AuthRouter = require("./routes/auth.route");
+const TaskRouter = require("./routes/task.route");
 const cors = require("cors");
 
 configDotenv();
@@ -34,6 +35,7 @@ app.listen(3000, () => {
 });
 
 app.use("/api/v1/auth", AuthRouter);
+app.use("/api/v1/task", TaskRouter);
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
