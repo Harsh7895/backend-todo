@@ -5,18 +5,15 @@ const ErrorHandler = require("../utils/error");
 const createTask = async (req, res, next) => {
   try {
     const { id } = req.user;
-    const { title, priority, checklist, dueDate, assigneeId } = req.body;
+    const { title, priority, checklist, dueDate, assignee } = req.body;
 
-    if (!title || !priority || !dueDate) {
-      return next(
-        ErrorHandler(400, "Title, Priority, and Due Date are required")
-      );
+    if (!title || !priority) {
+      return next(ErrorHandler(400, "Title and Priority are required"));
     }
 
-    let assignee = null;
-    if (assigneeId) {
-      assignee = await User.findById(assigneeId);
-      if (!assignee) {
+    if (assignee) {
+      const assigneeUser = await User.findOne({ email: assignee });
+      if (!assigneeUser) {
         return next(ErrorHandler(404, "Assignee not found"));
       }
     }
@@ -25,12 +22,32 @@ const createTask = async (req, res, next) => {
       title,
       priority,
       checklist,
-      dueDate,
+      dueDate: dueDate ? dueDate : null,
       createdBy: id,
-      assignee: assignee ? assignee._id : null,
+      assignee,
+      addedToBoard: [],
     });
 
     await newTask.save();
+
+    await User.findByIdAndUpdate(
+      id,
+      { $addToSet: { tasks: newTask._id } },
+      { new: true }
+    );
+
+    const creator = await User.findById(id).populate("shareBoardTo");
+    const sharedUsers = creator.shareBoardTo;
+
+    const updatePromises = sharedUsers.map((user) =>
+      User.findByIdAndUpdate(
+        user._id,
+        { $addToSet: { tasks: newTask._id } },
+        { new: true }
+      )
+    );
+
+    await Promise.all(updatePromises);
 
     res.status(201).json({
       success: true,
@@ -45,17 +62,12 @@ const createTask = async (req, res, next) => {
 const getUserTasks = async (req, res, next) => {
   try {
     const { id } = req.user;
-
-    const createdTasks = await Task.find({ createdBy: id });
-
-    const assignedTasks = await Task.find({ assignee: id });
+    const user = await User.findById(id);
+    const userTasks = await Task.find({ _id: { $in: user.tasks } });
 
     res.status(200).json({
       success: true,
-      tasks: {
-        createdTasks,
-        assignedTasks,
-      },
+      tasks: userTasks,
     });
   } catch (error) {
     next(ErrorHandler(500, "Server error while fetching tasks"));
@@ -98,6 +110,51 @@ const updateTask = async (req, res, next) => {
   }
 };
 
+const shareBoard = async (req, res, next) => {
+  try {
+    const { id: userId } = req.user;
+    const { email } = req.body;
+
+    const recipient = await User.findOne({ email });
+    if (!recipient) {
+      return next(ErrorHandler(404, "User not found"));
+    }
+
+    if (!recipient.shareBoardWith.includes(userId)) {
+      recipient.shareBoardWith.push(userId);
+      await recipient.save();
+    }
+
+    const user = await User.findById(userId);
+    if (!user.shareBoardTo.includes(recipient._id)) {
+      user.shareBoardTo.push(recipient._id);
+      await user.save();
+    }
+
+    const createdTasks = await Task.find({ createdBy: userId });
+    const assignedTasks = await Task.find({ assignee: user.email });
+
+    const taskIdsToUpdate = [
+      ...new Set([...createdTasks, ...assignedTasks].map((task) => task._id)),
+    ];
+
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { tasks: { $each: taskIdsToUpdate } },
+    });
+
+    await User.findByIdAndUpdate(recipient._id, {
+      $addToSet: { tasks: { $each: taskIdsToUpdate } },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Board and assigned tasks shared successfully",
+    });
+  } catch (error) {
+    next(ErrorHandler(500, "Server error while sharing board"));
+  }
+};
+
 const updateChecklistItem = async (req, res) => {
   const { taskId, itemIndex } = req.params;
   const { isCompleted } = req.body;
@@ -121,6 +178,7 @@ const deleteTask = async (req, res, next) => {
     const { id: userId } = req.user;
 
     const task = await Task.findById(taskId);
+    const user = await User.findById(userId);
 
     if (!task) {
       return next(ErrorHandler(404, "Task not found"));
@@ -128,10 +186,21 @@ const deleteTask = async (req, res, next) => {
 
     if (
       task.createdBy.toString() !== userId &&
-      !task.assignee.includes(userId)
+      !task.assignee === user.email &&
+      !task.addedToBoard.includes(userId)
     ) {
       return next(ErrorHandler(403, "Unauthorized to delete this task"));
     }
+
+    await User.updateMany(
+      {
+        $or: [
+          { _id: { $in: task.shareBoardWith } },
+          { _id: { $in: task.shareBoardTo } },
+        ],
+      },
+      { $pull: { tasks: taskId } } // Remove the task ID from their tasks array
+    );
 
     await task.deleteOne();
 
@@ -147,11 +216,28 @@ const deleteTask = async (req, res, next) => {
 const getEmailsForAssign = async (req, res, next) => {
   try {
     const { id: userId } = req.user;
-    const allEmails = await User.find({ email: { $neq: userId } });
+    const allEmails = await User.find({ _id: { $ne: userId } });
 
     res.status(200).json({
       success: true,
-      allEmails,
+      emails: allEmails.map((user) => user.email),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getTask = async (req, res, next) => {
+  const { taskId } = req.params;
+  try {
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return next(ErrorHandler(400, "Task not found"));
+    }
+
+    res.status(200).json({
+      success: true,
+      task,
     });
   } catch (error) {
     return next(error);
@@ -165,4 +251,6 @@ module.exports = {
   updateChecklistItem,
   deleteTask,
   getEmailsForAssign,
+  shareBoard,
+  getTask,
 };

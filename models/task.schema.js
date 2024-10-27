@@ -6,7 +6,7 @@ const checklistItemSchema = new Schema({
     type: String,
     required: true,
   },
-  done: {
+  isCompleted: {
     type: Boolean,
     default: false,
   },
@@ -31,8 +31,10 @@ const taskSchema = new Schema(
     checklist: [checklistItemSchema],
     dueDate: {
       type: Date,
+      default: null,
     },
-    assignee: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    assignee: { type: String, default: "" },
+    addedToBoard: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

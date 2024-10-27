@@ -7,6 +7,9 @@ const {
   updateChecklistItem,
   deleteTask,
   getEmailsForAssign,
+  shareBoard,
+  getTask,
+  getAnalytics,
 } = require("../controllers/task.controller");
 const verifyUser = require("../utils/verifyuser");
 
@@ -20,5 +23,6 @@ router.patch(
 );
 router.delete("/delete/:taskId", verifyUser, deleteTask);
 router.get("/allAssigneeEmails", verifyUser, getEmailsForAssign);
-
+router.post("/share-board", verifyUser, shareBoard);
+router.get("/:taskId", getTask);
 module.exports = router;
