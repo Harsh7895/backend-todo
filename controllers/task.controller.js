@@ -146,6 +146,11 @@ const shareBoard = async (req, res, next) => {
       $addToSet: { tasks: { $each: taskIdsToUpdate } },
     });
 
+    await Task.updateMany(
+      { _id: { $in: taskIdsToUpdate } },
+      { $addToSet: { addedToBoard: recipient._id } }
+    );
+
     res.status(200).json({
       success: true,
       message: "Board and assigned tasks shared successfully",
@@ -178,29 +183,19 @@ const deleteTask = async (req, res, next) => {
     const { id: userId } = req.user;
 
     const task = await Task.findById(taskId);
-    const user = await User.findById(userId);
-
     if (!task) {
       return next(ErrorHandler(404, "Task not found"));
     }
 
     if (
       task.createdBy.toString() !== userId &&
-      !task.assignee === user.email &&
+      task.assignee !== req.user.email &&
       !task.addedToBoard.includes(userId)
     ) {
       return next(ErrorHandler(403, "Unauthorized to delete this task"));
     }
 
-    await User.updateMany(
-      {
-        $or: [
-          { _id: { $in: task.shareBoardWith } },
-          { _id: { $in: task.shareBoardTo } },
-        ],
-      },
-      { $pull: { tasks: taskId } } // Remove the task ID from their tasks array
-    );
+    await User.updateMany({ tasks: taskId }, { $pull: { tasks: taskId } });
 
     await task.deleteOne();
 
