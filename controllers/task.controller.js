@@ -65,60 +65,9 @@ const getUserTasks = async (req, res, next) => {
     const user = await User.findById(id);
     const userTasks = await Task.find({ _id: { $in: user.tasks } });
 
-    let filteredTasks = userTasks;
-
-    const today = new Date();
-    const startOfToday = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    );
-    const endOfToday = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate() + 1
-    );
-
-    if (filter === "today") {
-      filteredTasks = userTasks.filter((task) => {
-        return (
-          task.dueDate &&
-          task.dueDate >= startOfToday &&
-          task.dueDate < endOfToday
-        );
-      });
-    } else if (filter === "this-week") {
-      const dayOfWeek = today.getDay();
-      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const startOfWeek = new Date(
-        today.setDate(today.getDate() + diffToMonday)
-      );
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(endOfWeek.getDate() + 6);
-
-      filteredTasks = userTasks.filter((task) => {
-        return (
-          task.dueDate &&
-          task.dueDate >= startOfWeek &&
-          task.dueDate < endOfWeek
-        );
-      });
-    } else if (filter === "this-month") {
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-      filteredTasks = userTasks.filter((task) => {
-        return (
-          task.dueDate &&
-          task.dueDate >= startOfMonth &&
-          task.dueDate <= endOfMonth
-        );
-      });
-    }
-
     res.status(200).json({
       success: true,
-      tasks: filteredTasks,
+      tasks: userTasks,
     });
   } catch (error) {
     next(ErrorHandler(500, "Server error while fetching tasks"));
