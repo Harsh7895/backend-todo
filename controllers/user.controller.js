@@ -50,14 +50,8 @@ const updateUser = async (req, res, next) => {
 const getUserAnalytics = async (req, res, next) => {
   try {
     const { id } = req.user;
-
-    const createdTasks = await Task.find({ createdBy: id });
-
-    const assignedTasks = await Task.find({ assignee: id });
-
-    const sharedTasks = await Task.find({ addedToBoard: { $in: [id] } });
-
-    const allTasks = [...createdTasks, ...assignedTasks, ...sharedTasks];
+    const user = await User.findById(id);
+    const allTasks = await Task.find({ _id: { $in: user.tasks } });
 
     const analytics = {
       backlogCount: allTasks.filter((task) => task.status === "Backlog").length,
