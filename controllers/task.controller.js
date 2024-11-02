@@ -62,8 +62,36 @@ const getUserTasks = async (req, res, next) => {
   try {
     const { id } = req.user;
     const { filter } = req.query;
+
     const user = await User.findById(id);
-    const userTasks = await Task.find({ _id: { $in: user.tasks } });
+    let userTasks = await Task.find({ _id: { $in: user.tasks } });
+
+    const today = new Date();
+    let startDate, endDate;
+
+    if (filter === "today") {
+      startDate = new Date(today.setHours(0, 0, 0, 0));
+      endDate = new Date(today.setHours(23, 59, 59, 999));
+    } else if (filter === "this-week") {
+      const dayOfWeek = today.getDay();
+      const diffToMonday =
+        today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      startDate = new Date(today.setDate(diffToMonday));
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(today.setDate(startDate.getDate() + 6));
+      endDate.setHours(23, 59, 59, 999);
+    } else if (filter === "this-month") {
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    if (filter !== "all") {
+      userTasks = userTasks.filter((task) => {
+        const dueDate = new Date(task.dueDate);
+        return dueDate >= startDate && dueDate <= endDate;
+      });
+    }
 
     res.status(200).json({
       success: true,
